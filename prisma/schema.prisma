@@ -1,0 +1,211 @@
+// HeartSpace - Prisma schema (PostgreSQL / Neon)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String    @unique
+  passwordHash  String
+  bio           String?
+  avatarUrl     String?
+  age           Int?
+  location      String?
+  interests     String?
+  lookingFor    String?
+  role          String    @default("user")
+  banned        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  posts         Post[]
+  comments      Comment[]
+  reactions     Reaction[]
+  conversationsA Conversation[] @relation("participantA")
+  conversationsB Conversation[] @relation("participantB")
+  messages      Message[]
+  journal       JournalEntry[]
+  quizResults   QuizResult[]
+  swipesGiven   Swipe[]     @relation("swiper")
+  swipesReceived Swipe[]    @relation("target")
+  matchesA      Match[]     @relation("matchA")
+  matchesB      Match[]     @relation("matchB")
+  contactRequestsSent     ContactRequest[] @relation("contactFrom")
+  contactRequestsReceived ContactRequest[] @relation("contactTo")
+  resetTokens   PasswordResetToken[]
+  notifications Notification[]
+  gratitude     GratitudeEntry[]
+  bookmarks     Bookmark[]
+  advisorMessages AdvisorMessage[]
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content     String
+  mood        String?
+  category    String    @default("general")
+  title       String?
+  likes       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  comments    Comment[]
+  reactions   Reaction[]
+  bookmarks   Bookmark[]
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  postId      String
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Reaction {
+  id          String    @id @default(cuid())
+  postId      String
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji       String
+  createdAt   DateTime  @default(now())
+  @@unique([postId, userId, emoji])
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  participantAId String
+  participantA   User      @relation("participantA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantBId String
+  participantB   User      @relation("participantB", fields: [participantBId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      Message[]
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String
+  createdAt      DateTime     @default(now())
+}
+
+model JournalEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  mood      String?
+  insight   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model QuizResult {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizType  String
+  result    String
+  scores    String?
+  createdAt DateTime @default(now())
+}
+
+model Swipe {
+  id        String   @id @default(cuid())
+  swiperId  String
+  swiper    User     @relation("swiper", fields: [swiperId], references: [id], onDelete: Cascade)
+  targetId  String
+  target    User     @relation("target", fields: [targetId], references: [id], onDelete: Cascade)
+  liked     Boolean
+  createdAt DateTime @default(now())
+  @@unique([swiperId, targetId])
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  matchAId  String
+  matchA    User     @relation("matchA", fields: [matchAId], references: [id], onDelete: Cascade)
+  matchBId  String
+  matchB    User     @relation("matchB", fields: [matchBId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([matchAId, matchBId])
+}
+
+model ContactRequest {
+  id          String    @id @default(cuid())
+  fromUserId  String
+  fromUser    User      @relation("contactFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId    String
+  toUser      User      @relation("contactTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  message     String
+  subject     String?
+  status      String    @default("pending")
+  adminReply  String?
+  createdAt   DateTime  @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model GratitudeEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  category  String   @default("general")
+  createdAt DateTime @default(now())
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([userId, postId])
+}
+
+model AdvisorMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+}

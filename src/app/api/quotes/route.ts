@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
-import { LOVE_QUOTES } from "@/lib/content";
+import { QUOTES } from "@/lib/content";
 
 export async function GET() {
-  // Fresh random quote on every request / page reload
-  const i = Math.floor(Math.random() * LOVE_QUOTES.length);
-  return NextResponse.json({
-    quote: LOVE_QUOTES[i],
-    all: LOVE_QUOTES,
-  });
+  const idx = Math.floor(Math.random() * QUOTES.length);
+  return NextResponse.json({ quote: QUOTES[idx], index: idx });
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { QUOTES } from "@/lib/content";
+import { LOVE_QUOTES } from "@/lib/content";
 
 export async function GET() {
-  const idx = Math.floor(Math.random() * QUOTES.length);
-  return NextResponse.json({ quote: QUOTES[idx], index: idx });
+  const idx = Math.floor(Math.random() * LOVE_QUOTES.length);
+  return NextResponse.json({ quote: LOVE_QUOTES[idx], index: idx });
 }

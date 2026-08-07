@@ -1,7 +1,7 @@
 /**
- * Aria AI client — works with z-ai-web-dev-sdk when available,
- * or with any OpenAI-compatible API via env vars (OPENAI_API_KEY / ZAI_API_KEY).
- * Structure of the app is unchanged; only the transport is more portable for Vercel.
+ * Aria AI client — OpenAI-compatible API via env vars only.
+ * Set OPENAI_API_KEY or ZAI_API_KEY (and optional OPENAI_BASE_URL / ZAI_BASE_URL / AI_MODEL).
+ * No private SDK required — works on Vercel.
  */
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -10,61 +10,42 @@ type ChatCompletionResult = {
   choices: Array<{ message?: { content?: string }; delta?: { content?: string } }>;
 };
 
-async function createViaSdk(messages: ChatMessage[], stream: boolean) {
-  const ZAI = (await import("z-ai-web-dev-sdk")).default;
-  const envKey = process.env.ZAI_API_KEY || process.env.OPENAI_API_KEY;
-  const envBase =
+function getConfig() {
+  const apiKey = process.env.ZAI_API_KEY || process.env.OPENAI_API_KEY;
+  const baseUrl = (
     process.env.ZAI_BASE_URL ||
     process.env.OPENAI_BASE_URL ||
-    "https://api.openai.com/v1";
+    "https://api.openai.com/v1"
+  ).replace(/\/$/, "");
+  const model = process.env.AI_MODEL || "gpt-4o-mini";
+  return { apiKey, baseUrl, model };
+}
 
-  if (envKey) {
-    const create = async (body: any) => {
-      const url = `${envBase.replace(/\/$/, "")}/chat/completions`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${envKey}`,
-        },
-        body: JSON.stringify({
-          model: process.env.AI_MODEL || "gpt-4o-mini",
-          messages: body.messages,
-          stream: !!body.stream,
-        }),
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`AI API ${res.status}: ${errText}`);
-      }
-      if (body.stream) return res.body;
-      return res.json();
-    };
-    return {
-      chat: {
-        completions: {
-          create: async (opts: any) => create({ ...opts, stream }),
-        },
-      },
-    };
+async function chatCompletions(messages: ChatMessage[], stream: boolean) {
+  const { apiKey, baseUrl, model } = getConfig();
+  if (!apiKey) {
+    throw new Error(
+      "AI is not configured. Set OPENAI_API_KEY or ZAI_API_KEY in environment variables."
+    );
   }
-
-  return ZAI.create();
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model, messages, stream }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`AI API ${res.status}: ${errText}`);
+  }
+  if (stream) return res;
+  return res.json() as Promise<ChatCompletionResult>;
 }
 
-export async function createAriaClient() {
-  return createViaSdk([], false);
-}
-
-export async function completeAria(
-  messages: ChatMessage[]
-): Promise<string> {
-  const client = await createViaSdk(messages, false);
-  const completion = (await client.chat.completions.create({
-    messages,
-    thinking: { type: "disabled" },
-  })) as ChatCompletionResult;
-
+export async function completeAria(messages: ChatMessage[]): Promise<string> {
+  const completion = (await chatCompletions(messages, false)) as ChatCompletionResult;
   const reply = completion?.choices?.[0]?.message?.content?.trim();
   if (!reply) throw new Error("Empty AI response");
   return reply;
@@ -74,57 +55,39 @@ export async function streamAria(
   messages: ChatMessage[],
   onDelta: (delta: string) => void
 ): Promise<string> {
-  const client = await createViaSdk(messages, true);
-  const completion = await client.chat.completions.create({
-    messages,
-    thinking: { type: "disabled" },
-    stream: true,
-  });
+  const res = (await chatCompletions(messages, true)) as Response;
+  const reader = res.body?.getReader();
+  if (!reader) {
+    const fallback = "I'm here, and I heard you. Tell me a bit more?";
+    onDelta(fallback);
+    return fallback;
+  }
 
+  const decoder = new TextDecoder();
   let full = "";
+  let buffer = "";
 
-  if (completion && typeof (completion as any).getReader === "function") {
-    const reader = (completion as ReadableStream<Uint8Array>).getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
-        if (payload === "[DONE]") continue;
-        try {
-          const json = JSON.parse(payload);
-          const delta = json?.choices?.[0]?.delta?.content;
-          if (delta) {
-            full += delta;
-            onDelta(delta);
-          }
-        } catch {
-          // ignore partial JSON
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === "[DONE]") continue;
+      try {
+        const json = JSON.parse(payload);
+        const delta = json?.choices?.[0]?.delta?.content;
+        if (delta) {
+          full += delta;
+          onDelta(delta);
         }
+      } catch {
+        // ignore partial JSON
       }
-    }
-  } else if (completion && Symbol.asyncIterator in Object(completion)) {
-    for await (const chunk of completion as any) {
-      const delta = chunk?.choices?.[0]?.delta?.content;
-      if (delta) {
-        full += delta;
-        onDelta(delta);
-      }
-    }
-  } else {
-    const reply =
-      (completion as ChatCompletionResult)?.choices?.[0]?.message?.content?.trim() ||
-      "";
-    if (reply) {
-      full = reply;
-      onDelta(reply);
     }
   }
 

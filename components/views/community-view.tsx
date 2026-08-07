@@ -136,27 +136,24 @@ export function CommunityView() {
     }
   }, [])
 
-  // Initial load + category / sort changes
+  // Initial load + category / sort / query changes
   useEffect(() => {
     fetchPosts(1, category, query, sort)
-     
-  }, [category, sort])
+  }, [category, sort, query, fetchPosts])
 
-  // Debounced search
+  // Debounced search → updates query (which triggers the fetch effect above)
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => {
       if (searchInput !== query) {
         setQuery(searchInput)
         setPage(1)
-        fetchPosts(1, category, searchInput, sort)
       }
     }, 350)
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current)
     }
-     
-  }, [searchInput])
+  }, [searchInput, query])
 
   // Deep-link: when params.post is set, fetch & highlight
   useEffect(() => {

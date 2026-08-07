@@ -24,6 +24,7 @@ export function AppShell() {
   const { view, navigate, params } = useApp()
   const { user, isLoading } = useCurrentUser()
 
+  // hydrate view from URL on first load
   useEffect(() => {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
@@ -35,9 +36,11 @@ export function AppShell() {
       })
       navigate(v, p)
     }
+    // seed if empty (silent)
     api('/api/seed', { method: 'POST' }).catch(() => {})
   }, [navigate])
 
+  // guard auth-required views
   useEffect(() => {
     if (isLoading) return
     const authRequired: ViewKey[] = ['messages', 'journal', 'admin', 'profile', 'discover', 'advisor']

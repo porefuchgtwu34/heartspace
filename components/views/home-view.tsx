@@ -48,9 +48,10 @@ export function HomeView() {
     <div className="relative">
       <Hero />
       <FeaturesStrip />
+      {/* Quotes early so mobile visitors see them without long scroll */}
+      <QuotesCarousel quoteIdx={quoteIdx} setQuoteIdx={setQuoteIdx} />
       <FeatureGrid />
       <HowItWorks />
-      <QuotesCarousel quoteIdx={quoteIdx} setQuoteIdx={setQuoteIdx} />
       <StatsBand posts={stats.posts} />
       <FinalCTA />
     </div>
@@ -120,7 +121,6 @@ function Hero() {
 
         <motion.div ref={ref} onMouseMove={onMove} onMouseLeave={() => { mx.set(0); my.set(0) }} style={{ rotateX: rx, rotateY: ry, transformPerspective: 1000 }} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.7, delay: 0.1 }} className="relative">
           <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-rose-500/20 ring-1 ring-rose-500/10">
-            { }
             <img src="/hero-love.png" alt="Two people sharing a tender moment at golden hour" className="w-full h-[320px] sm:h-[420px] object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-rose-950/40 via-transparent to-transparent" />
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="absolute bottom-4 left-4 right-4 rounded-2xl bg-white/85 dark:bg-rose-950/80 backdrop-blur-md p-4 shadow-lg">
@@ -295,22 +295,19 @@ function HowItWorks() {
 function QuotesCarousel({ quoteIdx, setQuoteIdx }: { quoteIdx: number; setQuoteIdx: (fn: (i: number) => number) => void }) {
   const q = LOVE_QUOTES[quoteIdx]
   return (
-    <section className="py-16 md:py-24 relative overflow-hidden">
+    <section className="py-8 sm:py-12 md:py-16 relative overflow-hidden border-b border-border/40">
       <div className="absolute inset-0 -z-10 opacity-50" style={{ backgroundImage: 'radial-gradient(50% 50% at 50% 50%, oklch(0.85 0.1 350 / 0.15), transparent)' }} />
       <div className="mx-auto max-w-4xl px-4 sm:px-6 text-center">
-        <motion.div key={quoteIdx} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <Quote className="mx-auto h-10 w-10 text-rose-500/40 mb-4" />
-          <blockquote className="font-display text-2xl md:text-3xl font-medium italic leading-snug">"{q.text}"</blockquote>
-          <p className="mt-4 text-muted-foreground">— {q.author}</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-rose-600/80 dark:text-rose-300/80 mb-3">A thought for your heart</p>
+        <motion.div key={quoteIdx} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
+          <Quote className="mx-auto h-8 w-8 sm:h-10 sm:w-10 text-rose-500/40 mb-3" />
+          <blockquote className="font-display text-xl sm:text-2xl md:text-3xl font-medium italic leading-snug px-1">"{q.text}"</blockquote>
+          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-muted-foreground">— {q.author}</p>
         </motion.div>
-        <div className="mt-8 flex items-center justify-center gap-3">
-          <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setQuoteIdx((i) => (i - 1 + LOVE_QUOTES.length) % LOVE_QUOTES.length)}><ChevronLeft className="h-5 w-5" /></Button>
-          <div className="flex items-center gap-1.5">
-            {LOVE_QUOTES.map((_, i) => (
-              <button key={i} onClick={() => setQuoteIdx(() => i)} className={cn('h-2 rounded-full transition-all', i === quoteIdx ? 'w-6 bg-rose-500' : 'w-2 bg-rose-500/30 hover:bg-rose-500/50')} />
-            ))}
-          </div>
-          <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setQuoteIdx((i) => (i + 1) % LOVE_QUOTES.length)}><ChevronRight className="h-5 w-5" /></Button>
+        <div className="mt-5 sm:mt-8 flex items-center justify-center gap-3">
+          <Button variant="ghost" size="icon" className="rounded-full" aria-label="Previous quote" onClick={() => setQuoteIdx((i) => (i - 1 + LOVE_QUOTES.length) % LOVE_QUOTES.length)}><ChevronLeft className="h-5 w-5" /></Button>
+          <span className="text-xs tabular-nums text-muted-foreground min-w-[4.5rem]">{quoteIdx + 1} / {LOVE_QUOTES.length}</span>
+          <Button variant="ghost" size="icon" className="rounded-full" aria-label="Next quote" onClick={() => setQuoteIdx((i) => (i + 1) % LOVE_QUOTES.length)}><ChevronRight className="h-5 w-5" /></Button>
         </div>
       </div>
     </section>

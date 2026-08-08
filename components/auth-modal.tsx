@@ -68,6 +68,14 @@ export function AuthModal() {
       toast.error('Please fill in all fields.')
       return
     }
+    if (regPass.length < 8) {
+      toast.error('Password must be at least 8 characters.')
+      return
+    }
+    if (!/[a-zA-Z]/.test(regPass) || !/[0-9]/.test(regPass)) {
+      toast.error('Password must include at least one letter and one number.')
+      return
+    }
     setLoading(true)
     try {
       await api('/api/auth/register', {
@@ -125,6 +133,10 @@ export function AuthModal() {
     e.preventDefault()
     if (!resetToken.trim() || !resetPass) {
       toast.error('Paste your reset token and choose a new password.')
+      return
+    }
+    if (resetPass.length < 8 || !/[a-zA-Z]/.test(resetPass) || !/[0-9]/.test(resetPass)) {
+      toast.error('Password must be at least 8 characters with a letter and a number.')
       return
     }
     setLoading(true)
@@ -199,7 +211,7 @@ export function AuthModal() {
                     <Label htmlFor="reset-pass">New password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="reset-pass" type="password" placeholder="••••••••" className="pl-9" value={resetPass} onChange={(e) => setResetPass(e.target.value)} />
+                      <Input id="reset-pass" type="password" placeholder="8+ chars, letter + number" className="pl-9" value={resetPass} onChange={(e) => setResetPass(e.target.value)} />
                     </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
@@ -262,7 +274,7 @@ export function AuthModal() {
                     <Label htmlFor="reg-pass">Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="reg-pass" type="password" placeholder="min 6 characters" className="pl-9" value={regPass} onChange={(e) => setRegPass(e.target.value)} />
+                      <Input id="reg-pass" type="password" placeholder="8+ chars, letter + number" className="pl-9" value={regPass} onChange={(e) => setRegPass(e.target.value)} />
                     </div>
                   </div>
                   <div className="space-y-1.5">

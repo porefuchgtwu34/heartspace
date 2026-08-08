@@ -222,7 +222,7 @@ export function AuthModal() {
                     <Label htmlFor="login-id">Username or email</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="login-id" placeholder="luna or luna@example.com" className="pl-9" value={loginId} onChange={(e) => setLoginId(e.target.value)} />
+                      <Input id="login-id" placeholder="username or email" className="pl-9" value={loginId} onChange={(e) => setLoginId(e.target.value)} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -239,9 +239,6 @@ export function AuthModal() {
                     {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
                     Sign in
                   </Button>
-                  <p className="text-center text-xs text-muted-foreground">
-                    Try <button type="button" className="font-medium text-rose-600 hover:underline" onClick={() => { setLoginId('admin'); setLoginPass('admin123'); }}>admin demo</button> or <button type="button" className="font-medium text-rose-600 hover:underline" onClick={() => { setLoginId('luna'); setLoginPass('password123'); }}>luna demo</button>
-                  </p>
                 </form>
               </TabsContent>
 

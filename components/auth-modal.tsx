@@ -115,13 +115,15 @@ export function AuthModal() {
     }
     setLoading(true)
     try {
-      const res = await api<{ preview: string | null; token?: string }>('/api/auth/reset-request', {
+      const res = await api<{ preview?: string | null; token?: string; emailed?: boolean; message?: string }>('/api/auth/reset-request', {
         method: 'POST',
         json: { email: resetEmail.trim() },
       })
-      setResetPreview(res.preview)
+      if (res.preview) setResetPreview(res.preview)
       if (res.token) setResetToken(res.token)
-      toast.success('If that email exists, a reset link has been sent.')
+      toast.success(res.message || (res.emailed
+        ? 'Check your inbox for a reset link.'
+        : 'If that email is registered, a reset link has been sent.'))
     } catch (err: any) {
       toast.error(err.message || 'Could not process request.')
     } finally {
@@ -182,7 +184,7 @@ export function AuthModal() {
                   <ArrowLeft className="h-4 w-4 mr-1" /> Back to sign in
                 </Button>
                 <h3 className="font-display text-lg font-semibold">Reset your password</h3>
-                <p className="text-sm text-muted-foreground">We'll send a reset link to your email.</p>
+                <p className="text-sm text-muted-foreground">We'll email a reset link to your inbox (check spam if you don't see it).</p>
               </div>
               {!resetPreview ? (
                 <form onSubmit={handleResetRequest} className="space-y-3">

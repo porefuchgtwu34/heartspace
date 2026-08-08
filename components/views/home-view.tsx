@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
+import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { useApp } from '@/lib/store'
 import { useCurrentUser } from '@/hooks/use-current-user'
 import { Button } from '@/components/ui/button'
@@ -48,7 +48,6 @@ export function HomeView() {
     <div className="relative">
       <Hero />
       <FeaturesStrip />
-      {/* Quotes early so mobile visitors see them without long scroll */}
       <QuotesCarousel quoteIdx={quoteIdx} setQuoteIdx={setQuoteIdx} />
       <FeatureGrid />
       <HowItWorks />
@@ -299,11 +298,22 @@ function QuotesCarousel({ quoteIdx, setQuoteIdx }: { quoteIdx: number; setQuoteI
       <div className="absolute inset-0 -z-10 opacity-50" style={{ backgroundImage: 'radial-gradient(50% 50% at 50% 50%, oklch(0.85 0.1 350 / 0.15), transparent)' }} />
       <div className="mx-auto max-w-4xl px-4 sm:px-6 text-center">
         <p className="text-xs font-medium uppercase tracking-wider text-rose-600/80 dark:text-rose-300/80 mb-3">A thought for your heart</p>
-        <motion.div key={quoteIdx} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-          <Quote className="mx-auto h-8 w-8 sm:h-10 sm:w-10 text-rose-500/40 mb-3" />
-          <blockquote className="font-display text-xl sm:text-2xl md:text-3xl font-medium italic leading-snug px-1">"{q.text}"</blockquote>
-          <p className="mt-3 sm:mt-4 text-sm sm:text-base text-muted-foreground">— {q.author}</p>
-        </motion.div>
+        <div className="relative min-h-[9.5rem] sm:min-h-[10.5rem] flex items-center justify-center">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={quoteIdx}
+              initial={{ opacity: 0, y: 14, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -10, filter: 'blur(3px)' }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full"
+            >
+              <Quote className="mx-auto h-8 w-8 sm:h-10 sm:w-10 text-rose-500/40 mb-3" />
+              <blockquote className="font-display text-xl sm:text-2xl md:text-3xl font-medium italic leading-snug px-1">"{q.text}"</blockquote>
+              <p className="mt-3 sm:mt-4 text-sm sm:text-base text-muted-foreground">— {q.author}</p>
+            </motion.div>
+          </AnimatePresence>
+        </div>
         <div className="mt-5 sm:mt-8 flex items-center justify-center gap-3">
           <Button variant="ghost" size="icon" className="rounded-full" aria-label="Previous quote" onClick={() => setQuoteIdx((i) => (i - 1 + LOVE_QUOTES.length) % LOVE_QUOTES.length)}><ChevronLeft className="h-5 w-5" /></Button>
           <span className="text-xs tabular-nums text-muted-foreground min-w-[4.5rem]">{quoteIdx + 1} / {LOVE_QUOTES.length}</span>

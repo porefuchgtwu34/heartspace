@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useApp, type ViewKey } from '@/lib/store'
 import { useCurrentUser } from '@/hooks/use-current-user'
 import { api } from '@/lib/api'
@@ -19,6 +20,33 @@ import { BreatheView } from '@/components/views/breathe-view'
 import { ProfileView } from '@/components/views/profile-view'
 import { AdminView } from '@/components/views/admin-view'
 import { FloatingHearts } from '@/components/floating-hearts'
+
+const viewFade = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -6 },
+}
+
+const viewTransition = {
+  duration: 0.28,
+  ease: [0.22, 1, 0.36, 1] as const,
+}
+
+function ViewFrame({ viewKey, children }: { viewKey: ViewKey; children: React.ReactNode }) {
+  return (
+    <motion.div
+      key={viewKey}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      variants={viewFade}
+      transition={viewTransition}
+      className="w-full"
+    >
+      {children}
+    </motion.div>
+  )
+}
 
 export function AppShell() {
   const { view, navigate, params } = useApp()
@@ -53,17 +81,59 @@ export function AppShell() {
     <div className="min-h-screen flex flex-col bg-background">
       <FloatingHearts />
       <AppHeader />
-      <main className="flex-1 w-full">
-        {view === 'home' && <HomeView />}
-        {view === 'community' && <CommunityView />}
-        {view === 'messages' && <MessagesView />}
-        {view === 'journal' && <JournalView />}
-        {view === 'quiz' && <QuizView />}
-        {view === 'discover' && <DiscoverView />}
-        {view === 'advisor' && <AdvisorView />}
-        {view === 'breathe' && <BreatheView />}
-        {view === 'profile' && <ProfileView />}
-        {view === 'admin' && <AdminView />}
+      <main className="flex-1 w-full relative">
+        <AnimatePresence mode="wait" initial={false}>
+          {view === 'home' && (
+            <ViewFrame viewKey="home">
+              <HomeView />
+            </ViewFrame>
+          )}
+          {view === 'community' && (
+            <ViewFrame viewKey="community">
+              <CommunityView />
+            </ViewFrame>
+          )}
+          {view === 'messages' && (
+            <ViewFrame viewKey="messages">
+              <MessagesView />
+            </ViewFrame>
+          )}
+          {view === 'journal' && (
+            <ViewFrame viewKey="journal">
+              <JournalView />
+            </ViewFrame>
+          )}
+          {view === 'quiz' && (
+            <ViewFrame viewKey="quiz">
+              <QuizView />
+            </ViewFrame>
+          )}
+          {view === 'discover' && (
+            <ViewFrame viewKey="discover">
+              <DiscoverView />
+            </ViewFrame>
+          )}
+          {view === 'advisor' && (
+            <ViewFrame viewKey="advisor">
+              <AdvisorView />
+            </ViewFrame>
+          )}
+          {view === 'breathe' && (
+            <ViewFrame viewKey="breathe">
+              <BreatheView />
+            </ViewFrame>
+          )}
+          {view === 'profile' && (
+            <ViewFrame viewKey="profile">
+              <ProfileView />
+            </ViewFrame>
+          )}
+          {view === 'admin' && (
+            <ViewFrame viewKey="admin">
+              <AdminView />
+            </ViewFrame>
+          )}
+        </AnimatePresence>
       </main>
       <AppFooter />
       <AuthModal />

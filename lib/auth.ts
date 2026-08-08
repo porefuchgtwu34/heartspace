@@ -2,6 +2,14 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import {
+  loginSchema,
+  INVALID_CREDENTIALS_MESSAGE,
+} from "@/lib/credentials";
+
+/** Dummy hash so bcrypt.compare always runs (mitigates timing leaks when user missing) */
+const DUMMY_HASH =
+  "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -20,25 +28,39 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.identifier || !credentials?.password) {
-          throw new Error("Please enter your username/email and password.");
+        const parsed = loginSchema.safeParse({
+          identifier: credentials?.identifier,
+          password: credentials?.password,
+        });
+        if (!parsed.success) {
+          throw new Error(
+            parsed.error.errors[0]?.message ?? INVALID_CREDENTIALS_MESSAGE
+          );
         }
-        const identifier = credentials.identifier.trim().toLowerCase();
+
+        const identifier = parsed.data.identifier.toLowerCase();
+        const password = parsed.data.password;
+
         const user = await db.user.findFirst({
           where: {
             OR: [{ email: identifier }, { username: identifier }],
           },
         });
-        if (!user) {
-          throw new Error("No account found with those details.");
+
+        // Always compare — even if user is missing — to reduce timing side-channels
+        const hash = user?.passwordHash ?? DUMMY_HASH;
+        const valid = await bcrypt.compare(password, hash);
+
+        if (!user || !valid) {
+          throw new Error(INVALID_CREDENTIALS_MESSAGE);
         }
+
         if (user.banned) {
-          throw new Error("This account has been suspended. Contact support.");
+          throw new Error(
+            "This account has been suspended. Contact support."
+          );
         }
-        const valid = await bcrypt.compare(credentials.password, user.passwordHash);
-        if (!valid) {
-          throw new Error("Incorrect password. Please try again.");
-        }
+
         return {
           id: user.id,
           name: user.username,

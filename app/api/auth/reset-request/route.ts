@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "@/lib/db";
+import { appOrigin, escapeHtml, sendEmail } from "@/lib/email";
 
 /**
  * Request a password reset.
  * Always returns a generic success payload (no email enumeration).
- * When RESEND_API_KEY is set, sends a real email to the account address.
+ * When RESEND_API_KEY is set, sends a real email — never returns the token in production.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Invalidate previous unused tokens for this user
+    await db.passwordResetToken.updateMany({
+      where: { userId: user.id, used: false },
+      data: { used: true },
+    });
+
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1000 * 60 * 30); // 30 min
 
@@ -44,12 +51,7 @@ export async function POST(req: NextRequest) {
       data: { userId: user.id, token, expiresAt },
     });
 
-    const origin =
-      process.env.NEXTAUTH_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      req.nextUrl.origin ||
-      "http://localhost:3000";
-    const base = origin.replace(/\/$/, "");
+    const base = appOrigin(req.nextUrl.origin);
     const resetUrl = `${base}/?reset=${token}`;
 
     const subject = "Reset your HeartSpace password";
@@ -73,7 +75,7 @@ If you did not ask for this, you can ignore this email — your password will st
       <table role="presentation" width="100%" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #fce7f3;">
         <tr>
           <td style="background:linear-gradient(135deg,#f43f5e,#d946ef);padding:28px 24px;color:#fff;">
-            <div style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">HeartSpace</div>
+            <div style="font-size:20px;font-weight:700;">HeartSpace</div>
             <div style="font-size:13px;opacity:0.9;margin-top:4px;">Password reset</div>
           </td>
         </tr>
@@ -100,77 +102,39 @@ If you did not ask for this, you can ignore this email — your password will st
 </body>
 </html>`;
 
-    const resendKey = process.env.RESEND_API_KEY?.trim();
-    let emailed = false;
-    let emailError: string | null = null;
+    const sent = await sendEmail({
+      to: user.email,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    });
 
-    if (resendKey) {
-      try {
-        const from =
-          process.env.RESEND_FROM?.trim() ||
-          "HeartSpace <onboarding@resend.dev>";
-
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${resendKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from,
-            to: [user.email],
-            subject,
-            text: textBody,
-            html: htmlBody,
-          }),
-        });
-
-        if (res.ok) {
-          emailed = true;
-        } else {
-          const errText = await res.text();
-          console.error("Resend error", res.status, errText);
-          emailError = `Email provider error (${res.status})`;
-        }
-      } catch (err) {
-        console.error("Resend send failed", err);
-        emailError = "Failed to reach email provider";
-      }
-    } else {
-      console.warn(
-        "RESEND_API_KEY is not set — password reset email was not sent."
-      );
-      emailError = "Email is not configured on the server";
+    if (!sent.ok) {
+      console.error("Password reset email failed:", sent.error);
     }
 
-    // Production: never leak tokens. Demo-only fallback when email is not configured.
+    // Never expose tokens in production. Dev-only fallback when email fails.
     const isProd = process.env.NODE_ENV === "production";
-    const allowPreview = !emailed && !isProd;
+    const allowDevPreview = !isProd && !sent.ok;
 
     return NextResponse.json({
       ok: true,
-      emailed,
-      message: emailed
+      emailed: sent.ok,
+      message: sent.ok
         ? "Check your inbox for a reset link (and spam folder just in case)."
-        : "If that email is registered, a reset link has been sent.",
-      ...(allowPreview
+        : isProd
+          ? "If that email is registered, a reset link has been sent."
+          : `Email not sent (${sent.error || "not configured"}). Dev preview included below.`,
+      ...(allowDevPreview
         ? {
             preview: `To: ${user.email}\nSubject: ${subject}\n\n${textBody}`,
             token,
+            emailError: sent.error,
           }
         : {}),
-      ...(!emailed && !isProd && emailError ? { emailError } : {}),
     });
   } catch (e: unknown) {
     console.error("reset-request error", e);
     return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
   }
-}
-
-function escapeHtml(s: string) {
-  return s
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """);
 }

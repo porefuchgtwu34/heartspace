@@ -15,21 +15,19 @@ export type ViewKey =
   | 'profile'
   | 'admin'
 
+export type AuthMode = 'login' | 'register' | 'reset' | 'verify'
+
 interface AppState {
   view: ViewKey
   setView: (v: ViewKey) => void
-  // auxiliary navigation params (e.g. open a specific post / conversation)
   params: Record<string, string>
   setParams: (p: Record<string, string>) => void
   navigate: (v: ViewKey, params?: Record<string, string>) => void
-  // auth modal
-  authModal: 'login' | 'register' | 'reset' | null
-  openAuth: (mode: 'login' | 'register' | 'reset') => void
+  authModal: AuthMode | null
+  openAuth: (mode: AuthMode) => void
   closeAuth: () => void
-  // profile composer open
   composeOpen: boolean
   setComposeOpen: (v: boolean) => void
-  // mobile sidebar
   sidebarOpen: boolean
   setSidebarOpen: (v: boolean) => void
 }

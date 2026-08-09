@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -8,15 +8,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Heart, Mail, Lock, User, Sparkles, ArrowLeft } from 'lucide-react'
+import { Loader2, Heart, Mail, Lock, User, Sparkles, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useApp } from '@/lib/store'
 
 export function AuthModal() {
-  const { authModal, closeAuth, openAuth } = useApp()
+  const { authModal, closeAuth, openAuth, params } = useApp()
   const [loading, setLoading] = useState(false)
   const [resetPreview, setResetPreview] = useState<string | null>(null)
+  const [resetSent, setResetSent] = useState(false)
 
   const [loginId, setLoginId] = useState('')
   const [loginPass, setLoginPass] = useState('')
@@ -30,6 +31,14 @@ export function AuthModal() {
   const [verifyEmail, setVerifyEmail] = useState('')
 
   const open = authModal !== null
+
+  // Prefill reset token from URL param (when user clicks email link)
+  useEffect(() => {
+    if (authModal === 'reset' && params?.resetToken) {
+      setResetToken(params.resetToken)
+      setResetSent(true)
+    }
+  }, [authModal, params?.resetToken])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -81,12 +90,7 @@ export function AuthModal() {
     }
     setLoading(true)
     try {
-      const res = await api<{
-        message?: string
-        emailed?: boolean
-        requiresVerification?: boolean
-        previewToken?: string
-      }>('/api/auth/register', {
+      const res = await api<{ message?: string }>('/api/auth/register', {
         method: 'POST',
         json: {
           username: regUser.trim(),
@@ -95,7 +99,6 @@ export function AuthModal() {
           bio: regBio.trim() || undefined,
         },
       })
-
       toast.success(res.message || 'Account created — check your email to verify.')
       setVerifyEmail(regEmail.trim())
       setRegUser('')
@@ -117,7 +120,7 @@ export function AuthModal() {
     }
     setLoading(true)
     try {
-      const res = await api<{ message?: string; emailed?: boolean }>('/api/auth/verify-email', {
+      const res = await api<{ message?: string }>('/api/auth/verify-email', {
         method: 'POST',
         json: { email: verifyEmail.trim() },
       })
@@ -137,12 +140,22 @@ export function AuthModal() {
     }
     setLoading(true)
     try {
-      const res = await api<{ preview?: string | null; token?: string; emailed?: boolean; message?: string }>(
-        '/api/auth/reset-request',
-        { method: 'POST', json: { email: resetEmail.trim() } }
-      )
-      if (res.preview) setResetPreview(res.preview)
-      if (res.token) setResetToken(res.token)
+      const res = await api<{
+        preview?: string | null
+        token?: string
+        emailed?: boolean
+        message?: string
+      }>('/api/auth/reset-request', {
+        method: 'POST',
+        json: { email: resetEmail.trim() },
+      })
+
+      // Production: never show tokens. Only dev returns preview/token.
+      if (res.preview && res.token) {
+        setResetPreview(res.preview)
+        setResetToken(res.token)
+      }
+      setResetSent(true)
       toast.success(
         res.message ||
           (res.emailed
@@ -177,6 +190,7 @@ export function AuthModal() {
       setResetPass('')
       setResetPreview(null)
       setResetEmail('')
+      setResetSent(false)
       openAuth('login')
     } catch (err: any) {
       toast.error(err.message || 'Reset failed.')
@@ -216,7 +230,12 @@ export function AuthModal() {
                   variant="ghost"
                   size="sm"
                   className="-ml-2 mb-1 text-muted-foreground"
-                  onClick={() => openAuth('login')}
+                  onClick={() => {
+                    setResetSent(false)
+                    setResetPreview(null)
+                    setResetToken('')
+                    openAuth('login')
+                  }}
                 >
                   <ArrowLeft className="h-4 w-4 mr-1" /> Back to sign in
                 </Button>
@@ -225,7 +244,8 @@ export function AuthModal() {
                   We'll email a reset link to your inbox (check spam if you don't see it).
                 </p>
               </div>
-              {!resetPreview ? (
+
+              {!resetSent ? (
                 <form onSubmit={handleResetRequest} className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="reset-email">Email</Label>
@@ -246,9 +266,10 @@ export function AuthModal() {
                     Send reset link
                   </Button>
                 </form>
-              ) : (
+              ) : resetPreview ? (
+                // Dev-only fallback when email is not configured
                 <form onSubmit={handleResetPassword} className="space-y-3">
-                  <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                  <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground whitespace-pre-wrap font-mono max-h-40 overflow-y-auto">
                     {resetPreview}
                   </div>
                   <div className="space-y-1.5">
@@ -279,6 +300,56 @@ export function AuthModal() {
                     Update password
                   </Button>
                 </form>
+              ) : resetToken ? (
+                // Came from email link (?reset=token)
+                <form onSubmit={handleResetPassword} className="space-y-3">
+                  <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-sm flex gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span>Choose a new password for your account.</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reset-pass-link">New password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="reset-pass-link"
+                        type="password"
+                        placeholder="8+ chars, letter + number"
+                        className="pl-9"
+                        value={resetPass}
+                        onChange={(e) => setResetPass(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Update password
+                  </Button>
+                </form>
+              ) : (
+                // Production: email sent — no token shown
+                <div className="space-y-4 text-center py-2">
+                  <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-rose-500/10">
+                    <Mail className="h-6 w-6 text-rose-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Check your email</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      If an account exists for that address, we sent a reset link. It expires in 30
+                      minutes.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setResetSent(false)
+                      setResetEmail('')
+                    }}
+                  >
+                    Try a different email
+                  </Button>
+                </div>
               )}
             </div>
           ) : authModal === 'verify' ? (
@@ -319,7 +390,11 @@ export function AuthModal() {
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
                   Already verified?{' '}
-                  <button type="button" className="text-rose-600 hover:underline" onClick={() => openAuth('login')}>
+                  <button
+                    type="button"
+                    className="text-rose-600 hover:underline"
+                    onClick={() => openAuth('login')}
+                  >
                     Sign in
                   </button>
                 </p>
@@ -357,7 +432,12 @@ export function AuthModal() {
                       <button
                         type="button"
                         className="text-xs text-rose-600 hover:underline"
-                        onClick={() => openAuth('reset')}
+                        onClick={() => {
+                          setResetSent(false)
+                          setResetPreview(null)
+                          setResetToken('')
+                          openAuth('reset')
+                        }}
                       >
                         Forgot?
                       </button>
@@ -384,7 +464,11 @@ export function AuthModal() {
                   </Button>
                   <p className="text-center text-xs text-muted-foreground">
                     Need a verification email?{' '}
-                    <button type="button" className="text-rose-600 hover:underline" onClick={() => openAuth('verify')}>
+                    <button
+                      type="button"
+                      className="text-rose-600 hover:underline"
+                      onClick={() => openAuth('verify')}
+                    >
                       Resend link
                     </button>
                   </p>

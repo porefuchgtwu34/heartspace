@@ -50,10 +50,10 @@ function ViewFrame({ viewKey, children }: { viewKey: ViewKey; children: React.Re
 }
 
 export function AppShell() {
-  const { view, navigate, openAuth } = useApp()
+  const { view, navigate, openAuth, setParams } = useApp()
   const { user, isLoading } = useCurrentUser()
 
-  // hydrate view + email verification from URL
+  // hydrate view + email verification / password reset from URL
   useEffect(() => {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
@@ -61,7 +61,7 @@ export function AppShell() {
     if (v) {
       const p: Record<string, string> = {}
       url.searchParams.forEach((val, key) => {
-        if (key !== 'view' && key !== 'verify') p[key] = val
+        if (key !== 'view' && key !== 'verify' && key !== 'reset') p[key] = val
       })
       navigate(v, p)
     }
@@ -70,7 +70,7 @@ export function AppShell() {
     if (verifyToken) {
       ;(async () => {
         try {
-          const res = await api<{ ok?: boolean; message?: string; error?: string }>(
+          const res = await api<{ ok?: boolean; message?: string }>(
             '/api/auth/verify-email',
             { method: 'POST', json: { token: verifyToken } }
           )
@@ -85,7 +85,15 @@ export function AppShell() {
         }
       })()
     }
-  }, [navigate, openAuth])
+
+    const resetToken = url.searchParams.get('reset')
+    if (resetToken) {
+      setParams({ resetToken })
+      openAuth('reset')
+      url.searchParams.delete('reset')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [navigate, openAuth, setParams])
 
   useEffect(() => {
     if (isLoading) return

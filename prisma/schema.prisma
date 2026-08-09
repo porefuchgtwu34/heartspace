@@ -45,6 +45,10 @@ model User {
   gratitude     GratitudeEntry[]
   bookmarks     Bookmark[]
   advisorMessages AdvisorMessage[]
+  reportsFiled  Report[]    @relation("reporter")
+  blocksGiven   Block[]     @relation("blocker")
+  blocksReceived Block[]    @relation("blocked")
+  checkIns      DailyCheckIn[]
 }
 
 model Post {
@@ -221,4 +225,40 @@ model AdvisorMessage {
   role      String
   content   String
   createdAt DateTime @default(now())
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  reporter   User     @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType String
+  targetId   String
+  reason     String
+  details    String?
+  status     String   @default("open")
+  createdAt  DateTime @default(now())
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model DailyCheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day       String
+  mood      String
+  moodScore Int
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, day])
 }

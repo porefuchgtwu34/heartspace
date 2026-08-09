@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { toast } from 'sonner'
 import { useApp, type ViewKey } from '@/lib/store'
 import { useCurrentUser } from '@/hooks/use-current-user'
 import { api } from '@/lib/api'
@@ -49,10 +50,10 @@ function ViewFrame({ viewKey, children }: { viewKey: ViewKey; children: React.Re
 }
 
 export function AppShell() {
-  const { view, navigate, params } = useApp()
+  const { view, navigate, openAuth } = useApp()
   const { user, isLoading } = useCurrentUser()
 
-  // hydrate view from URL on first load
+  // hydrate view + email verification from URL
   useEffect(() => {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
@@ -60,14 +61,32 @@ export function AppShell() {
     if (v) {
       const p: Record<string, string> = {}
       url.searchParams.forEach((val, key) => {
-        if (key !== 'view') p[key] = val
+        if (key !== 'view' && key !== 'verify') p[key] = val
       })
       navigate(v, p)
     }
-    // Seed is admin-only via SEED_SECRET — do not call from the client.
-  }, [navigate])
 
-  // guard auth-required views
+    const verifyToken = url.searchParams.get('verify')
+    if (verifyToken) {
+      ;(async () => {
+        try {
+          const res = await api<{ ok?: boolean; message?: string; error?: string }>(
+            '/api/auth/verify-email',
+            { method: 'POST', json: { token: verifyToken } }
+          )
+          toast.success(res.message || 'Email verified! You can sign in.')
+          openAuth('login')
+        } catch (e: any) {
+          toast.error(e?.message || 'Verification failed. Request a new link.')
+          openAuth('verify')
+        } finally {
+          url.searchParams.delete('verify')
+          window.history.replaceState({}, '', url.toString())
+        }
+      })()
+    }
+  }, [navigate, openAuth])
+
   useEffect(() => {
     if (isLoading) return
     const authRequired: ViewKey[] = ['messages', 'journal', 'admin', 'profile', 'discover', 'advisor']

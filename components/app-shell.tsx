@@ -64,8 +64,7 @@ export function AppShell() {
       })
       navigate(v, p)
     }
-    // seed if empty (silent)
-    api('/api/seed', { method: 'POST' }).catch(() => {})
+    // Seed is admin-only via SEED_SECRET — do not call from the client.
   }, [navigate])
 
   // guard auth-required views

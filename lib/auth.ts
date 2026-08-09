@@ -47,7 +47,6 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        // Always compare — even if user is missing — to reduce timing side-channels
         const hash = user?.passwordHash ?? DUMMY_HASH;
         const valid = await bcrypt.compare(password, hash);
 
@@ -58,6 +57,19 @@ export const authOptions: NextAuthOptions = {
         if (user.banned) {
           throw new Error(
             "This account has been suspended. Contact support."
+          );
+        }
+
+        // Require verified email (admins bypass so ops is never locked out)
+        const requireVerification =
+          process.env.REQUIRE_EMAIL_VERIFICATION !== "false";
+        if (
+          requireVerification &&
+          !user.emailVerified &&
+          user.role !== "admin"
+        ) {
+          throw new Error(
+            "Please verify your email before signing in. Check your inbox or resend the link."
           );
         }
 

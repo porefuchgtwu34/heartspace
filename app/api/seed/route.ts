@@ -9,7 +9,6 @@ export async function POST(req: NextRequest) {
     new URL(req.url).searchParams.get("secret") ||
     "";
 
-  // In production, require SEED_SECRET. In dev, allow empty if not set.
   const isProd = process.env.NODE_ENV === "production";
   if (isProd) {
     if (!seedSecret || headerSecret !== seedSecret) {
@@ -26,19 +25,26 @@ export async function POST(req: NextRequest) {
     headerSecret === seedSecret;
 
   if (existing > 0 && !force) {
+    // Backfill verification for any legacy accounts still null
+    await db.user.updateMany({
+      where: { emailVerified: null },
+      data: { emailVerified: new Date() },
+    });
     return NextResponse.json({ ok: true, message: "Already seeded", count: existing });
   }
 
+  const now = new Date();
   const adminPass = await bcrypt.hash("admin123", 10);
   const admin = await db.user.upsert({
     where: { email: "jackkamogelo83@gmail.com" },
-    update: { role: "admin", passwordHash: adminPass },
+    update: { role: "admin", passwordHash: adminPass, emailVerified: now },
     create: {
       username: "admin",
       email: "jackkamogelo83@gmail.com",
       passwordHash: adminPass,
       role: "admin",
       bio: "HeartSpace community steward",
+      emailVerified: now,
     },
   });
 
@@ -55,8 +61,8 @@ export async function POST(req: NextRequest) {
     const pass = await bcrypt.hash("password123", 10);
     const user = await db.user.upsert({
       where: { email: u.email },
-      update: {},
-      create: { ...u, passwordHash: pass },
+      update: { emailVerified: now },
+      create: { ...u, passwordHash: pass, emailVerified: now },
     });
     created.push(user);
   }
